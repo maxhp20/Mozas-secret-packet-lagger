@@ -1,0 +1,793 @@
+-- // moza.vs packet lagger //
+
+local Players      = game:GetService("Players")
+local UIS          = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RS           = game:GetService("ReplicatedStorage")
+local HttpService  = game:GetService("HttpService")
+local SoundService = game:GetService("SoundService")
+
+local LP = Players.LocalPlayer
+local CONFIG_FILE = "MozaVSPacketLagger_Config.json"
+
+-- ============ THEME (ULTRA-POLISHED LUXURY DARK CRIMSON) ============
+local ACCENT_RED   = Color3.fromRGB(240, 35, 45)
+local ACCENT_BRIGHT= Color3.fromRGB(255, 60, 70)
+local ACCENT_DARK  = Color3.fromRGB(115, 12, 18)
+local BG_BLACK     = Color3.fromRGB(6, 4, 6)
+local BG_PANEL     = Color3.fromRGB(12, 8, 10)
+local BG_INPUT     = Color3.fromRGB(20, 12, 15)
+local BG_HOVER     = Color3.fromRGB(35, 20, 25)
+local TEXT_WHITE   = Color3.fromRGB(255, 240, 242)
+local TEXT_DIM     = Color3.fromRGB(170, 120, 125)
+local TEXT_GLOW    = Color3.fromRGB(255, 100, 110)
+local STROKE_RED   = Color3.fromRGB(90, 20, 25)
+
+-- ============ SFX ============
+local sfxFolder = Instance.new("Folder")
+sfxFolder.Name = "MozaVSSFX"
+sfxFolder.Parent = SoundService
+
+local function makeSfx(name, id, vol, pitch)
+    local s = Instance.new("Sound")
+    s.Name = name
+    s.SoundId = "rbxassetid://" .. tostring(id)
+    s.Volume = vol or 0.5
+    s.PlaybackSpeed = pitch or 1
+    s.Parent = sfxFolder
+    return s
+end
+
+local SFX = {
+    Click   = makeSfx("Click",    9114282417, 0.35, 1.0),
+    Hover   = makeSfx("Hover",    9114294822, 0.15, 1.4),
+    Start   = makeSfx("Start",    9114300981, 0.55, 0.9),
+    Stop    = makeSfx("Stop",     9114303932, 0.45, 0.75),
+    Toggle  = makeSfx("Toggle",   9114307441, 0.40, 1.2),
+    Keybind = makeSfx("Keybind",  9114310303, 0.40, 1.6),
+    Saved   = makeSfx("Saved",    9114313755, 0.40, 1.3),
+    Error   = makeSfx("Error",    9114316718, 0.40, 0.6),
+}
+
+local function playSfx(name)
+    local s = SFX[name]
+    if not s then return end
+    s:Stop()
+    s:Play()
+end
+
+-- ============ BILLBOARD GUI (ABOVE HEAD) ============
+local character = LP.Character or LP.CharacterAdded:Wait()
+
+local billboardGui = Instance.new("BillboardGui")
+billboardGui.Name = "MozaVSPacketLaggerBillboard"
+billboardGui.Size = UDim2.new(0, 200, 0, 44)
+billboardGui.StudsOffset = Vector3.new(0, 2.6, 0)
+billboardGui.AlwaysOnTop = true
+billboardGui.Parent = character:WaitForChild("HumanoidRootPart")
+
+local BbFrame = Instance.new("Frame", billboardGui)
+BbFrame.Size = UDim2.new(1, 0, 1, 0)
+BbFrame.BackgroundColor3 = BG_BLACK
+BbFrame.BackgroundTransparency = 0.2
+BbFrame.BorderSizePixel = 0
+Instance.new("UICorner", BbFrame).CornerRadius = UDim.new(0, 12)
+
+local BbStroke = Instance.new("UIStroke", BbFrame)
+BbStroke.Color = ACCENT_RED
+BbStroke.Thickness = 1.5
+
+local BbTitle = Instance.new("TextLabel", BbFrame)
+BbTitle.Size = UDim2.new(1, 0, 0.5, 0)
+BbTitle.BackgroundTransparency = 1
+BbTitle.Text = "MOZA.VS PACKET LAGGER"
+BbTitle.Font = Enum.Font.GothamBlack
+BbTitle.TextSize = 10
+BbTitle.TextColor3 = TEXT_WHITE
+
+local BbDiscord = Instance.new("TextLabel", BbFrame)
+BbDiscord.Position = UDim2.new(0, 0, 0.5, 0)
+BbDiscord.Size = UDim2.new(1, 0, 0.5, 0)
+BbDiscord.BackgroundTransparency = 1
+BbDiscord.Text = "discord.gg/T8pHNUs4ET"
+BbDiscord.Font = Enum.Font.GothamBold
+BbDiscord.TextSize = 9
+BbDiscord.TextColor3 = TEXT_GLOW
+
+LP.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    local hrp = newChar:WaitForChild("HumanoidRootPart", 5)
+    if hrp then
+        billboardGui.Parent = hrp
+    end
+end)
+
+-- ============ MAIN GUI ============
+local gui = Instance.new("ScreenGui")
+gui.Name = "MozaVSPacketLagger"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.DisplayOrder = 999
+gui.Parent = LP:WaitForChild("PlayerGui")
+
+local Main = Instance.new("Frame", gui)
+Main.Size = UDim2.new(0, 290, 0, 435)
+Main.Position = UDim2.new(0.5, -145, 0.5, -217)
+Main.BackgroundColor3 = BG_BLACK
+Main.BackgroundTransparency = 0.2 -- Fixed so background container textures show through clearly
+Main.BorderSizePixel = 0
+Main.ClipsDescendants = true 
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 18)
+
+local MainStroke = Instance.new("UIStroke", Main)
+MainStroke.Color = STROKE_RED
+MainStroke.Thickness = 1.5
+MainStroke.Transparency = 0.1
+MainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+-- ============ BACKGROUND IMAGES CONTAINER ============
+local BgContainer = Instance.new("Frame", Main)
+BgContainer.Name = "BackgroundContainer"
+BgContainer.Size = UDim2.new(1, 0, 1, 0)
+BgContainer.BackgroundTransparency = 1
+BgContainer.ZIndex = 0
+BgContainer.ClipsDescendants = true
+Instance.new("UICorner", BgContainer).CornerRadius = UDim.new(0, 18)
+
+local Bg1 = Instance.new("ImageLabel", BgContainer)
+Bg1.Size = UDim2.new(1, 0, 1, 0)
+Bg1.BackgroundTransparency = 1
+Bg1.Image = "rbxassetid://100498989994721"
+Bg1.ImageTransparency = 0.25 -- Made fully visible and clear
+Bg1.ScaleType = Enum.ScaleType.Crop
+
+local Bg2 = Instance.new("ImageLabel", BgContainer)
+Bg2.Size = UDim2.new(1, 0, 1, 0)
+Bg2.BackgroundTransparency = 1
+Bg2.Image = "rbxassetid://86672756130734"
+Bg2.ImageTransparency = 1
+Bg2.ScaleType = Enum.ScaleType.Crop
+
+local Bg3 = Instance.new("ImageLabel", BgContainer)
+Bg3.Size = UDim2.new(1, 0, 1, 0)
+Bg3.BackgroundTransparency = 1
+Bg3.Image = "rbxassetid://125226572840315"
+Bg3.ImageTransparency = 1
+Bg3.ScaleType = Enum.ScaleType.Crop
+
+local Vignette = Instance.new("Frame", BgContainer)
+Vignette.Size = UDim2.new(1, 0, 1, 0)
+Vignette.BackgroundColor3 = Color3.fromRGB(4, 3, 4)
+Vignette.BackgroundTransparency = 0.45 -- Softened so the artwork remains vibrant
+Vignette.BorderSizePixel = 0
+
+-- ============ TOP BAR ============
+local TopBar = Instance.new("Frame", Main)
+TopBar.Size = UDim2.new(1, 0, 0, 48)
+TopBar.BackgroundColor3 = BG_PANEL
+TopBar.BackgroundTransparency = 0.3
+TopBar.BorderSizePixel = 0
+TopBar.ZIndex = 10
+Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 18)
+
+local TopBarMask = Instance.new("Frame", TopBar)
+TopBarMask.Size = UDim2.new(1, 0, 0, 14)
+TopBarMask.Position = UDim2.new(0, 0, 1, -14)
+TopBarMask.BackgroundColor3 = BG_PANEL
+TopBarMask.BackgroundTransparency = 0.3
+TopBarMask.BorderSizePixel = 0
+TopBarMask.ZIndex = 10
+
+local Stripe = Instance.new("Frame", TopBar)
+Stripe.Size = UDim2.new(1, -20, 0, 2)
+Stripe.Position = UDim2.new(0, 10, 1, -2)
+Stripe.BorderSizePixel = 0
+Stripe.BackgroundColor3 = ACCENT_RED
+Stripe.ZIndex = 11
+
+local Title = Instance.new("TextLabel", TopBar)
+Title.BackgroundTransparency = 1
+Title.Position = UDim2.new(0, 14, 0, 0)
+Title.Size = UDim2.new(1, -70, 1, 0)
+Title.Text = "MOZA.VS LAGGER"
+Title.Font = Enum.Font.GothamBlack
+Title.TextSize = 13
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.TextYAlignment = Enum.TextYAlignment.Center
+Title.TextColor3 = TEXT_WHITE
+Title.ZIndex = 11
+
+local CollapseBtn = Instance.new("TextButton", TopBar)
+CollapseBtn.Size = UDim2.new(0, 24, 0, 24)
+CollapseBtn.Position = UDim2.new(1, -30, 0.5, -12)
+CollapseBtn.BackgroundColor3 = BG_INPUT
+CollapseBtn.BackgroundTransparency = 0.2
+CollapseBtn.BorderSizePixel = 0
+CollapseBtn.Text = "−"
+CollapseBtn.Font = Enum.Font.GothamBlack
+CollapseBtn.TextSize = 16
+CollapseBtn.TextColor3 = TEXT_WHITE
+CollapseBtn.AutoButtonColor = false
+CollapseBtn.ZIndex = 12
+Instance.new("UICorner", CollapseBtn).CornerRadius = UDim.new(0, 8)
+
+-- ============ CONTROL (START BUTTON) ============
+local StartBtn = Instance.new("TextButton", Main)
+StartBtn.Position = UDim2.new(0, 14, 0, 56)
+StartBtn.Size = UDim2.new(1, -28, 0, 40)
+StartBtn.BackgroundColor3 = ACCENT_DARK
+StartBtn.BackgroundTransparency = 0.2
+StartBtn.BorderSizePixel = 0
+StartBtn.Text = "START"
+StartBtn.Font = Enum.Font.GothamBlack
+StartBtn.TextSize = 15
+StartBtn.TextColor3 = TEXT_WHITE
+StartBtn.AutoButtonColor = false
+StartBtn.ZIndex = 15
+Instance.new("UICorner", StartBtn).CornerRadius = UDim.new(0, 10)
+local StartStroke = Instance.new("UIStroke", StartBtn)
+StartStroke.Color = ACCENT_BRIGHT
+StartStroke.Thickness = 1.5
+StartStroke.Transparency = 0.2
+
+-- ============ BODY CONTAINER ============
+local Body = Instance.new("Frame", Main)
+Body.Name = "BodyContainer"
+Body.Position = UDim2.new(0, 0, 0, 104)
+Body.Size = UDim2.new(1, 0, 1, -104)
+Body.BackgroundTransparency = 1
+Body.ZIndex = 2
+Body.ClipsDescendants = true
+
+local Pad = Instance.new("UIPadding", Body)
+Pad.PaddingTop = UDim.new(0, 6)
+Pad.PaddingBottom = UDim.new(0, 10)
+Pad.PaddingLeft = UDim.new(0, 14)
+Pad.PaddingRight = UDim.new(0, 14)
+
+-- ============ PACKET POWER INTENSITY ============
+local IntLabel = Instance.new("TextLabel", Body)
+IntLabel.BackgroundTransparency = 1
+IntLabel.Size = UDim2.new(1, 0, 0, 12)
+IntLabel.Text = "PACKET POWER INTENSITY"
+IntLabel.Font = Enum.Font.GothamBold
+IntLabel.TextSize = 9
+IntLabel.TextXAlignment = Enum.TextXAlignment.Left
+IntLabel.TextColor3 = TEXT_DIM
+IntLabel.ZIndex = 3
+
+local IntRow = Instance.new("Frame", Body)
+IntRow.Position = UDim2.new(0, 0, 0, 15)
+IntRow.Size = UDim2.new(1, 0, 0, 36)
+IntRow.BackgroundTransparency = 1
+IntRow.ZIndex = 3
+
+local function makeBtn(parent, text, w, x)
+    local b = Instance.new("TextButton", parent)
+    b.Size = UDim2.new(0, w, 1, 0)
+    b.Position = UDim2.new(0, x, 0, 0)
+    b.BackgroundColor3 = BG_INPUT
+    b.BackgroundTransparency = 0.25
+    b.BorderSizePixel = 0
+    b.Text = text
+    b.Font = Enum.Font.GothamBlack
+    b.TextSize = 16
+    b.TextColor3 = TEXT_WHITE
+    b.AutoButtonColor = false
+    b.ZIndex = 3
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+    local s = Instance.new("UIStroke", b)
+    s.Color = STROKE_RED
+    s.Thickness = 1
+    s.Transparency = 0.4
+    return b
+end
+
+local Minus = makeBtn(IntRow, "−", 36, 0)
+local Plus  = makeBtn(IntRow, "+", 36, 226)
+
+local IntBox = Instance.new("TextBox", IntRow)
+IntBox.Position = UDim2.new(0, 42, 0, 0)
+IntBox.Size = UDim2.new(0, 178, 1, 0)
+IntBox.BackgroundColor3 = BG_INPUT
+IntBox.BackgroundTransparency = 0.25
+IntBox.BorderSizePixel = 0
+IntBox.Text = "10000"
+IntBox.PlaceholderText = "power"
+IntBox.Font = Enum.Font.GothamBlack
+IntBox.TextSize = 16
+IntBox.TextColor3 = TEXT_GLOW
+IntBox.PlaceholderColor3 = TEXT_DIM
+IntBox.ClearTextOnFocus = false
+IntBox.ZIndex = 3
+Instance.new("UICorner", IntBox).CornerRadius = UDim.new(0, 8)
+local IntStroke = Instance.new("UIStroke", IntBox)
+IntStroke.Color = STROKE_RED
+IntStroke.Thickness = 1
+IntStroke.Transparency = 0.3
+
+-- ============ PRESETS ============
+local PresetRow = Instance.new("Frame", Body)
+PresetRow.Position = UDim2.new(0, 0, 0, 56)
+PresetRow.Size = UDim2.new(1, 0, 0, 24)
+PresetRow.BackgroundTransparency = 1
+PresetRow.ZIndex = 3
+
+local function makePreset(text, pos, width)
+    local b = Instance.new("TextButton", PresetRow)
+    b.Size = UDim2.new(width, 0, 1, 0)
+    b.Position = UDim2.new(pos, 0, 0, 0)
+    b.BackgroundColor3 = BG_INPUT
+    b.BackgroundTransparency = 0.25
+    b.BorderSizePixel = 0
+    b.Text = text
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 9
+    b.TextColor3 = TEXT_DIM
+    b.AutoButtonColor = false
+    b.ZIndex = 3
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+    local s = Instance.new("UIStroke", b)
+    s.Color = STROKE_RED
+    s.Thickness = 1
+    s.Transparency = 0.5
+    return b
+end
+
+local P1k   = makePreset("1K",  0,     0.18)
+local P10k  = makePreset("10K", 0.205, 0.18)
+local P25k  = makePreset("25K", 0.410, 0.18)
+local P50k  = makePreset("50K", 0.615, 0.18)
+local P100k = makePreset("100K EX", 0.82, 0.18)
+
+-- ============ DIVIDER 1 ============
+local Div1 = Instance.new("Frame", Body)
+Div1.Position = UDim2.new(0, 0, 0, 86)
+Div1.Size = UDim2.new(1, 0, 0, 1)
+Div1.BackgroundColor3 = STROKE_RED
+Div1.BackgroundTransparency = 0.5
+Div1.BorderSizePixel = 0
+Div1.ZIndex = 3
+
+-- ============ BACKGROUND SELECTOR ============
+local BgLabel = Instance.new("TextLabel", Body)
+BgLabel.BackgroundTransparency = 1
+BgLabel.Position = UDim2.new(0, 0, 0, 92)
+BgLabel.Size = UDim2.new(1, 0, 0, 12)
+BgLabel.Text = "BACKGROUND THEME"
+BgLabel.Font = Enum.Font.GothamBold
+BgLabel.TextSize = 9
+BgLabel.TextXAlignment = Enum.TextXAlignment.Left
+BgLabel.TextColor3 = TEXT_DIM
+BgLabel.ZIndex = 3
+
+local BgRow = Instance.new("Frame", Body)
+BgRow.Position = UDim2.new(0, 0, 0, 108)
+BgRow.Size = UDim2.new(1, 0, 0, 28)
+BgRow.BackgroundTransparency = 1
+BgRow.ZIndex = 3
+
+local function makeImageBgBtn(assetId, pos, width)
+    local b = Instance.new("ImageButton", BgRow)
+    b.Size = UDim2.new(width, 0, 1, 0)
+    b.Position = UDim2.new(pos, 0, 0, 0)
+    b.BackgroundColor3 = BG_INPUT
+    b.BackgroundTransparency = 0.25
+    b.BorderSizePixel = 0
+    b.Image = "rbxassetid://" .. tostring(assetId)
+    b.ScaleType = Enum.ScaleType.Crop
+    b.AutoButtonColor = false
+    b.ZIndex = 3
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+    local s = Instance.new("UIStroke", b)
+    s.Color = STROKE_RED
+    s.Thickness = 1.5
+    s.Transparency = 0.3
+    return b
+end
+
+local BgBtn1 = makeImageBgBtn(100498989994721, 0, 0.31)
+local BgBtn2 = makeImageBgBtn(86672756130734, 0.345, 0.31)
+local BgBtn3 = makeImageBgBtn(125226572840315, 0.69, 0.31)
+
+local function setBackground(activeIdx)
+    Bg1.ImageTransparency = (activeIdx == 1) and 0.25 or 1
+    Bg2.ImageTransparency = (activeIdx == 2) and 0.25 or 1
+    Bg3.ImageTransparency = (activeIdx == 3) and 0.25 or 1
+
+    BgBtn1.UIStroke.Color = (activeIdx == 1) and ACCENT_BRIGHT or STROKE_RED
+    BgBtn2.UIStroke.Color = (activeIdx == 2) and ACCENT_BRIGHT or STROKE_RED
+    BgBtn3.UIStroke.Color = (activeIdx == 3) and ACCENT_BRIGHT or STROKE_RED
+    playSfx("Click")
+end
+
+BgBtn1.MouseButton1Click:Connect(function() setBackground(1) end)
+BgBtn2.MouseButton1Click:Connect(function() setBackground(2) end)
+BgBtn3.MouseButton1Click:Connect(function() setBackground(3) end)
+
+-- ============ DIVIDER 2 ============
+local Div2 = Instance.new("Frame", Body)
+Div2.Position = UDim2.new(0, 0, 0, 142)
+Div2.Size = UDim2.new(1, 0, 0, 1)
+Div2.BackgroundColor3 = STROKE_RED
+Div2.BackgroundTransparency = 0.5
+Div2.BorderSizePixel = 0
+Div2.ZIndex = 3
+
+-- ============ KEYBIND ============
+local KeyLabel = Instance.new("TextLabel", Body)
+KeyLabel.BackgroundTransparency = 1
+KeyLabel.Position = UDim2.new(0, 0, 0, 148)
+KeyLabel.Size = UDim2.new(1, 0, 0, 12)
+KeyLabel.Text = "TOGGLE KEYBIND (KB / GAMEPAD)"
+KeyLabel.Font = Enum.Font.GothamBold
+KeyLabel.TextSize = 9
+KeyLabel.TextXAlignment = Enum.TextXAlignment.Left
+KeyLabel.TextColor3 = TEXT_DIM
+KeyLabel.ZIndex = 3
+
+local KeyBtn = Instance.new("TextButton", Body)
+KeyBtn.Position = UDim2.new(0, 0, 0, 164)
+KeyBtn.Size = UDim2.new(1, 0, 0, 28)
+KeyBtn.BackgroundColor3 = BG_INPUT
+KeyBtn.BackgroundTransparency = 0.25
+KeyBtn.BorderSizePixel = 0
+KeyBtn.Text = "G / ButtonY (Gamepad)"
+KeyBtn.Font = Enum.Font.GothamBlack
+KeyBtn.TextSize = 11
+KeyBtn.TextColor3 = TEXT_GLOW
+KeyBtn.AutoButtonColor = false
+KeyBtn.ZIndex = 3
+Instance.new("UICorner", KeyBtn).CornerRadius = UDim.new(0, 8)
+local KeyStroke = Instance.new("UIStroke", KeyBtn)
+KeyStroke.Color = STROKE_RED
+KeyStroke.Thickness = 1
+KeyStroke.Transparency = 0.3
+
+-- ============ AUTO-STEAL LISTENER TOGGLE (LARGE, PROMINENT BUTTON) ============
+local StealLabel = Instance.new("TextLabel", Body)
+StealLabel.BackgroundTransparency = 1
+StealLabel.Position = UDim2.new(0, 0, 0, 198)
+StealLabel.Size = UDim2.new(1, 0, 0, 12)
+StealLabel.Text = "AUTO-STEAL LISTENER"
+StealLabel.Font = Enum.Font.GothamBold
+StealLabel.TextSize = 9
+StealLabel.TextXAlignment = Enum.TextXAlignment.Left
+StealLabel.TextColor3 = TEXT_DIM
+StealLabel.ZIndex = 3
+
+local StealToggleBtn = Instance.new("TextButton", Body)
+StealToggleBtn.Position = UDim2.new(0, 0, 0, 214)
+StealToggleBtn.Size = UDim2.new(1, 0, 0, 44)
+StealToggleBtn.BackgroundColor3 = BG_INPUT
+StealToggleBtn.BackgroundTransparency = 0.25
+StealToggleBtn.BorderSizePixel = 0
+StealToggleBtn.Text = "AUTO-STEAL: OFF"
+StealToggleBtn.Font = Enum.Font.GothamBlack
+StealToggleBtn.TextSize = 14
+StealToggleBtn.TextColor3 = TEXT_DIM
+StealToggleBtn.AutoButtonColor = false
+StealToggleBtn.ZIndex = 3
+Instance.new("UICorner", StealToggleBtn).CornerRadius = UDim.new(0, 8)
+local StealStroke = Instance.new("UIStroke", StealToggleBtn)
+StealStroke.Color = STROKE_RED
+StealStroke.Thickness = 1.5
+StealStroke.Transparency = 0.3
+
+local listeningForKey = false
+local autoStealActive = false
+
+-- ============ STATE & LOGIC ============
+local lagging = false
+local lagThread
+local intensity = 10000
+local toggleKey = Enum.KeyCode.G
+local toggleGamepadKey = Enum.KeyCode.ButtonY
+local toggleKeyName = "G"
+local toggleGamepadName = "ButtonY"
+
+local function tween(obj, props, t)
+    TweenService:Create(obj, TweenInfo.new(t or 0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play()
+end
+
+local function clampIntensity(v)
+    v = tonumber(v)
+    if not v then return intensity end
+    return math.clamp(math.floor(v), 1, 200000)
+end
+
+local function updateIntensity()
+    intensity = clampIntensity(IntBox.Text)
+    IntBox.Text = tostring(intensity)
+end
+
+local function setIntensity(v, silent)
+    intensity = clampIntensity(v)
+    IntBox.Text = tostring(intensity)
+    if not silent then playSfx("Click") end
+end
+
+local function keyToName(keyCode)
+    if not keyCode then return "G" end
+    return keyCode.Name
+end
+
+local function nameToKey(name)
+    if not name then return Enum.KeyCode.G end
+    local ok, key = pcall(function() return Enum.KeyCode[name] end)
+    if ok and key then return key end
+    return Enum.KeyCode.G
+end
+
+local function applyKeybind(name)
+    toggleKeyName = name or "G"
+    toggleKey = nameToKey(toggleKeyName)
+    KeyBtn.Text = toggleKeyName .. " / " .. toggleGamepadName
+end
+
+local function saveConfig()
+    updateIntensity()
+    local cfg = {
+        Intensity = intensity,
+        Keybind   = toggleKeyName,
+        GamepadKey = toggleGamepadName,
+        AutoSteal = autoStealActive,
+        PX_S = Main.Position.X.Scale, PX_O = Main.Position.X.Offset,
+        PY_S = Main.Position.Y.Scale, PY_O = Main.Position.Y.Offset,
+    }
+    if writefile then
+        pcall(function()
+            writefile(CONFIG_FILE, HttpService:JSONEncode(cfg))
+        end)
+    end
+end
+
+local function loadConfig()
+    if not readfile or not isfile then return end
+    if not isfile(CONFIG_FILE) then return end
+    local ok, cfg = pcall(function()
+        return HttpService:JSONDecode(readfile(CONFIG_FILE))
+    end)
+    if ok and type(cfg) == "table" then
+        if tonumber(cfg.Intensity) then
+            intensity = clampIntensity(cfg.Intensity)
+            IntBox.Text = tostring(intensity)
+        end
+        if type(cfg.Keybind) == "string" and cfg.Keybind ~= "" then
+            toggleKeyName = cfg.Keybind
+            toggleKey = nameToKey(toggleKeyName)
+        end
+        if type(cfg.GamepadKey) == "string" and cfg.GamepadKey ~= "" then
+            toggleGamepadName = cfg.GamepadKey
+            pcall(function() toggleGamepadKey = Enum.KeyCode[toggleGamepadName] end)
+        end
+        KeyBtn.Text = toggleKeyName .. " / " .. toggleGamepadName
+        if type(cfg.AutoSteal) == "boolean" then
+            autoStealActive = cfg.AutoSteal
+            StealToggleBtn.Text = autoStealActive and "AUTO-STEAL: ON" or "AUTO-STEAL: OFF"
+            StealToggleBtn.TextColor3 = autoStealActive and TEXT_GLOW or TEXT_DIM
+            StealStroke.Color = autoStealActive and ACCENT_BRIGHT or STROKE_RED
+            StealToggleBtn.BackgroundColor3 = autoStealActive and ACCENT_DARK or BG_INPUT
+        end
+        if tonumber(cfg.PX_S) and tonumber(cfg.PX_O) and tonumber(cfg.PY_S) and tonumber(cfg.PY_O) then
+            Main.Position = UDim2.new(cfg.PX_S, cfg.PX_O, cfg.PY_S, cfg.PY_O)
+        end
+    end
+end
+
+local Event
+do
+    local ok, net = pcall(function()
+        return RS:WaitForChild("Packages"):WaitForChild("Net")
+    end)
+    if ok and net then
+        local kids = net:GetChildren()
+        Event = kids[230]
+    end
+end
+
+local function paintRunning()
+    tween(StartBtn, {BackgroundColor3 = Color3.fromRGB(180, 20, 30)}, 0.15)
+    StartBtn.Text = "STOP"
+    tween(StartStroke, {Transparency = 0}, 0.15)
+end
+
+local function paintIdle()
+    tween(StartBtn, {BackgroundColor3 = ACCENT_DARK}, 0.15)
+    StartBtn.Text = "START"
+    tween(StartStroke, {Transparency = 0.2}, 0.15)
+end
+
+local function startLagging()
+    if lagging then return end
+    if not Event then
+        playSfx("Error"); return
+    end
+    updateIntensity()
+    lagging = true
+    paintRunning()
+    playSfx("Start")
+
+    local payload = table.create(intensity, function() end)
+
+    lagThread = task.spawn(function()
+        while lagging do
+            for _ = 1, 3 do
+                pcall(function() Event:FireServer(payload) end)
+            end
+            task.wait(0.01)
+        end
+    end)
+end
+
+local function stopLagging()
+    if not lagging then return end
+    lagging = false
+    if lagThread then
+        pcall(task.cancel, lagThread)
+        lagThread = nil
+    end
+    paintIdle()
+    playSfx("Stop")
+end
+
+StartBtn.MouseButton1Click:Connect(function()
+    playSfx("Click")
+    if lagging then stopLagging() else startLagging() end
+end)
+
+IntBox.FocusLost:Connect(function()
+    updateIntensity()
+    playSfx("Click")
+    saveConfig()
+end)
+Minus.MouseButton1Click:Connect(function()
+    updateIntensity(); setIntensity(intensity - 1000); saveConfig()
+end)
+Plus.MouseButton1Click:Connect(function()
+    updateIntensity(); setIntensity(intensity + 1000); saveConfig()
+end)
+P1k.MouseButton1Click:Connect(function()   setIntensity(1000);   saveConfig() end)
+P10k.MouseButton1Click:Connect(function()  setIntensity(10000);  saveConfig() end)
+P25k.MouseButton1Click:Connect(function()  setIntensity(25000);  saveConfig() end)
+P50k.MouseButton1Click:Connect(function()  setIntensity(50000);  saveConfig() end)
+P100k.MouseButton1Click:Connect(function() setIntensity(100000); saveConfig() end)
+
+StealToggleBtn.MouseButton1Click:Connect(function()
+    autoStealActive = not autoStealActive
+    StealToggleBtn.Text = autoStealActive and "AUTO-STEAL: ON" or "AUTO-STEAL: OFF"
+    StealToggleBtn.TextColor3 = autoStealActive and TEXT_GLOW or TEXT_DIM
+    StealStroke.Color = autoStealActive and ACCENT_BRIGHT or STROKE_RED
+    StealToggleBtn.BackgroundColor3 = autoStealActive and ACCENT_DARK or BG_INPUT
+    playSfx("Toggle")
+    saveConfig()
+end)
+
+-- ============ AUTO-STEAL MONITOR ============
+task.spawn(function()
+    local SPEED_THRESHOLD = 25
+
+    while true do
+        if autoStealActive then
+            local char = LP.Character
+            local hasStealItem = false
+
+            if char then
+                for _, child in ipairs(char:GetChildren()) do
+                    if child:IsA("Tool") then
+                        local n = string.lower(child.Name)
+                        if n:find("steal") or n:find("cash") or n:find("bag") or n:find("loot") or n:find("brainrot") then
+                            hasStealItem = true
+                        end
+                    end
+                end
+
+                local humanoid = char:FindFirstChildOfClass("Humanoid")
+                if humanoid and humanoid.Health > 0 then
+                    if humanoid.WalkSpeed < SPEED_THRESHOLD then
+                        hasStealItem = true
+                    end
+                end
+            end
+
+            if hasStealItem then
+                if not lagging then
+                    startLagging()
+                end
+            else
+                if lagging then
+                    stopLagging()
+                end
+            end
+        end
+        task.wait(0.2)
+    end
+end)
+
+KeyBtn.MouseButton1Click:Connect(function()
+    if listeningForKey then return end
+    listeningForKey = true
+    KeyBtn.Text = "press keyboard / controller key..."
+    tween(KeyBtn, {BackgroundColor3 = ACCENT_DARK}, 0.15)
+    playSfx("Keybind")
+end)
+
+UIS.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+
+    if listeningForKey then
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            listeningForKey = false
+            applyKeybind(keyToName(input.KeyCode))
+            tween(KeyBtn, {BackgroundColor3 = BG_INPUT}, 0.15)
+            playSfx("Keybind")
+            saveConfig()
+        elseif input.UserInputType == Enum.UserInputType.Gamepad1 then
+            listeningForKey = false
+            toggleGamepadName = input.KeyCode.Name
+            toggleGamepadKey = input.KeyCode
+            KeyBtn.Text = toggleKeyName .. " / " .. toggleGamepadName
+            tween(KeyBtn, {BackgroundColor3 = BG_INPUT}, 0.15)
+            playSfx("Keybind")
+            saveConfig()
+        end
+        return
+    end
+
+    if input.KeyCode == toggleKey or input.KeyCode == toggleGamepadKey then
+        playSfx("Toggle")
+        if lagging then stopLagging() else startLagging() end
+    end
+end)
+
+-- ============ MINIMIZE ============
+local collapsed = false
+local FULL_H = 435
+local MINI_H = 104 
+
+CollapseBtn.MouseButton1Click:Connect(function()
+    collapsed = not collapsed
+    playSfx("Click")
+    if collapsed then
+        CollapseBtn.Text = "+"
+        tween(Main, {Size = UDim2.new(0, 290, 0, MINI_H)}, 0.3)
+    else
+        CollapseBtn.Text = "−"
+        tween(Main, {Size = UDim2.new(0, 290, 0, FULL_H)}, 0.3)
+    end
+end)
+
+-- ============ DRAG ============
+local dragging, dragStart, startPos
+TopBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = Main.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+                saveConfig()
+            end
+        end)
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+    or input.UserInputType == Enum.UserInputType.Touch) then
+        local d = input.Position - dragStart
+        Main.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + d.X,
+            startPos.Y.Scale, startPos.Y.Offset + d.Y
+        )
+    end
+end)
+
+-- ============ INTRO ============
+Main.Size = UDim2.new(0, 290, 0, 0)
+Main.BackgroundTransparency = 1
+task.defer(loadConfig)
+tween(Main, {Size = UDim2.new(0, 290, 0, FULL_H), BackgroundTransparency = 0.2}, 0.4)
+paintIdle()
